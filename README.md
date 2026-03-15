@@ -62,7 +62,7 @@ On the first build, libtorch (~300MB) is downloaded automatically. The build scr
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `-a`, `--algorithm` | `lanczos` | Algorithm: `bicubic`, `lanczos`, `spline`, `swinir` |
+| `-a`, `--algorithm` | `swinir` | Algorithm: `swinir`, `bicubic`, `lanczos`, `spline` |
 | `--crf` | `18` | Output quality (0 = lossless, 51 = lowest) |
 | `-m`, `--model` | auto | Custom SwinIR model path (.pt) |
 | `--tile-size` | `256` | Tile size for SwinIR (must be multiple of 8, 0 = no tiling) |
@@ -72,17 +72,17 @@ On the first build, libtorch (~300MB) is downloaded automatically. The build scr
 ### Examples
 
 ```bash
-# SwinIR x2 upscale
-./target/release/swinir-rs input.mp4 output.mp4 x2 -a swinir
+# SwinIR x2 upscale (default algorithm)
+./target/release/swinir-rs input.mp4 output.mp4 x2
 
 # SwinIR x4 upscale with high quality
-./target/release/swinir-rs input.mp4 output.mp4 x4 -a swinir --crf 12
+./target/release/swinir-rs input.mp4 output.mp4 x4 --crf 12
 
 # BFloat16 inference (faster on M3+)
-./target/release/swinir-rs input.mp4 output.mp4 x2 -a swinir --bf16
+./target/release/swinir-rs input.mp4 output.mp4 x2 --bf16
 
 # lanczos interpolation via ffmpeg (no GPU needed)
-./target/release/swinir-rs input.mp4 output.mp4 x2
+./target/release/swinir-rs input.mp4 output.mp4 x2 -a lanczos
 ```
 
 ## Algorithms

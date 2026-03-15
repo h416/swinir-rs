@@ -18,7 +18,7 @@ struct Cli {
     /// Scale factor (x2, x3, x4)
     scale: String,
     /// Upscale algorithm (bicubic, lanczos, spline, swinir)
-    #[arg(short = 'a', long = "algorithm", default_value = "lanczos")]
+    #[arg(short = 'a', long = "algorithm", default_value = "swinir")]
     algorithm: String,
     /// Output quality (0=lossless, 18=visually near-lossless)
     #[arg(long, default_value_t = 18)]
