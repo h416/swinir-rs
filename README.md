@@ -20,6 +20,11 @@ AI video upscaling on Apple Silicon using [SwinIR](https://github.com/JingyunLia
 
 ## Setup
 
+```bash
+git clone https://github.com/h416/swinir-rs.git
+cd swinir-rs
+```
+
 ### 1. Download pre-traced models
 
 Download the TorchScript models from [GitHub Releases](https://github.com/h416/swinir-rs/releases/tag/v0.1.0) and place them in `weights/`:
