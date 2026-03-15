@@ -114,8 +114,8 @@ If you want to export the TorchScript models yourself instead of downloading the
    ```
 
 2. Download SwinIR pretrained weights from the [official repository](https://github.com/JingyunLiang/SwinIR/releases):
-   - `003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x2_GAN.pth` -> `weights/swinir_real_x2_gan.pth`
-   - `003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN.pth` -> `weights/swinir_real_x4_gan.pth`
+   - `003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x2_GAN.pth` -> `weights/swinir_real_x2_gan.pth`
+   - `003_realSR_BSRGAN_DFO_s64w8_SwinIR-M_x4_GAN.pth` -> `weights/swinir_real_x4_gan.pth`
 
 3. Run the export script:
    ```bash
