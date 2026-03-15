@@ -1,0 +1,6 @@
+target/
+weights/*.pth
+weights/*.pt
+!weights/.gitkeep
+collapsed.txt
+.DS_Store

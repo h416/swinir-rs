@@ -1,0 +1,24 @@
+[package]
+name = "swinir-rs"
+version = "0.1.0"
+edition = "2024"
+description = "AI video upscaling using SwinIR on Apple Silicon"
+license = "Apache-2.0"
+repository = "https://github.com/h416/swinir-rs"
+
+[dependencies]
+tch = { version = "=0.23", features = ["download-libtorch"] }
+torch-sys = { version = "=0.23", features = ["download-libtorch"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+indicatif = "0.17"
+anyhow = "1"
+
+[profile.release]
+debug = 1  # line tables for profiling (dtrace/instruments)
+
+[build-dependencies]
+cc = "1"

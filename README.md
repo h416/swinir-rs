@@ -1,0 +1,139 @@
+# swinir-rs
+
+AI video upscaling on Apple Silicon using [SwinIR](https://github.com/JingyunLiang/SwinIR) (Swin Transformer for Image Restoration). Powered by TorchScript and [tch-rs](https://github.com/LaurentMazare/tch-rs) with MPS GPU acceleration.
+
+## Features
+
+- **SwinIR super-resolution** -- x2 and x4 upscaling for real-world video
+- **MPS GPU acceleration** -- runs on Apple Silicon GPU via Metal Performance Shaders
+- **BFloat16 inference** -- optional BF16 mode for faster processing on M3+ chips
+- **Tiled processing** -- handles large frames with configurable tile size and overlap blending
+- **ffmpeg fallback** -- bicubic, lanczos, and spline algorithms via ffmpeg (no GPU required)
+- **Self-contained binary** -- libtorch dylibs are bundled automatically; no `DYLD_LIBRARY_PATH` or venv needed
+
+## Requirements
+
+- macOS Apple Silicon (M1 or later)
+- Rust toolchain
+- ffmpeg (`brew install ffmpeg`)
+- Python 3 + PyTorch (only for model export)
+
+## Setup
+
+### 1. Download pre-traced models
+
+Download the TorchScript models from [GitHub Releases](https://github.com/h416/swinir-rs/releases) and place them in `weights/`:
+
+```
+weights/swinir_real_x2_traced.pt
+weights/swinir_real_x4_traced.pt
+```
+
+Alternatively, export models yourself (see [Model Export](#model-export) below).
+
+### 2. Build
+
+```bash
+cargo build --release
+```
+
+On the first build, libtorch (~300MB) is downloaded automatically. The build script copies dylibs to `target/release/lib/` and sets rpath, so no environment variables are needed.
+
+## Usage
+
+```bash
+./target/release/swinir-rs INPUT.mp4 OUTPUT.mp4 SCALE [OPTIONS]
+```
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `INPUT`  | Input MP4 path |
+| `OUTPUT` | Output MP4 path |
+| `SCALE`  | Scale factor: `x2`, `x3`, `x4` |
+
+### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `-a`, `--algorithm` | `lanczos` | Algorithm: `bicubic`, `lanczos`, `spline`, `swinir` |
+| `--crf` | `18` | Output quality (0 = lossless, 51 = lowest) |
+| `-m`, `--model` | auto | Custom SwinIR model path (.pt) |
+| `--tile-size` | `256` | Tile size for SwinIR (must be multiple of 8, 0 = no tiling) |
+| `--bf16` | off | Use BFloat16 precision (M3+ chips recommended) |
+| `--profile` | off | Print per-frame profiling breakdown |
+
+### Examples
+
+```bash
+# SwinIR x2 upscale
+./target/release/swinir-rs input.mp4 output.mp4 x2 -a swinir
+
+# SwinIR x4 upscale with high quality
+./target/release/swinir-rs input.mp4 output.mp4 x4 -a swinir --crf 12
+
+# BFloat16 inference (faster on M3+)
+./target/release/swinir-rs input.mp4 output.mp4 x2 -a swinir --bf16
+
+# lanczos interpolation via ffmpeg (no GPU needed)
+./target/release/swinir-rs input.mp4 output.mp4 x2
+```
+
+## Algorithms
+
+| Algorithm | Method | GPU | Supported scales |
+|-----------|--------|-----|------------------|
+| `bicubic` | ffmpeg `-vf scale` | No | x2, x3, x4 |
+| `lanczos` | ffmpeg `-vf scale` | No | x2, x3, x4 |
+| `spline`  | ffmpeg `-vf scale` | No | x2, x3, x4 |
+| `swinir`  | TorchScript inference | MPS (auto) | x2, x4 |
+
+SwinIR automatically uses MPS GPU when available, falling back to CPU otherwise.
+
+## Performance
+
+SwinIR x2 upscale, 640x360 input, Apple M4 Pro:
+
+| Method | Speed |
+|--------|-------|
+| MPS (GPU) | ~5.2 s/frame |
+
+## Model Export
+
+If you want to export the TorchScript models yourself instead of downloading them:
+
+1. Install Python dependencies:
+   ```bash
+   pip install torch timm
+   ```
+
+2. Download SwinIR pretrained weights from the [official repository](https://github.com/JingyunLiang/SwinIR/releases):
+   - `003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x2_GAN.pth` -> `weights/swinir_real_x2_gan.pth`
+   - `003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN.pth` -> `weights/swinir_real_x4_gan.pth`
+
+3. Run the export script:
+   ```bash
+   python scripts/export_torchscript.py
+   ```
+
+   This generates `weights/swinir_real_x2_traced.pt` and `weights/swinir_real_x4_traced.pt`.
+
+## How It Works
+
+1. Extract video frames as PNG using ffmpeg (with VideoToolbox hardware decoding)
+2. Upscale each frame through the SwinIR TorchScript model on MPS GPU
+3. Extract audio from the original video
+4. Recombine upscaled frames + audio into the output MP4
+
+For large frames, the tiled processing mode splits each frame into overlapping tiles, processes them individually, and blends the results using linear weighting in the overlap regions.
+
+## License
+
+Apache-2.0
+
+## Acknowledgments
+
+- [SwinIR](https://github.com/JingyunLiang/SwinIR) by Liang et al. -- the original SwinIR model and pretrained weights
+- [tch-rs](https://github.com/LaurentMazare/tch-rs) -- Rust bindings for PyTorch/libtorch
+- [Claude Code](https://claude.ai/code) -- AI coding assistant used in development
