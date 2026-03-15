@@ -69,6 +69,18 @@ On the first build, libtorch (~300MB) is downloaded automatically. The build scr
 | `--bf16` | off | Use BFloat16 precision (M3+ chips recommended) |
 | `--profile` | off | Print per-frame profiling breakdown |
 
+### Tile Size
+
+`--tile-size` controls how the frame is split for processing. Setting it to the shorter side of the input video reduces tiling overhead and improves speed.
+
+For example, with a 640x360 input:
+```bash
+# Match the shorter side (360), rounded down to a multiple of 8
+./target/release/swinir-rs input.mp4 output.mp4 x2 --tile-size 360
+```
+
+Use `--tile-size 0` to process the entire frame at once (requires more GPU memory).
+
 ### Examples
 
 ```bash
