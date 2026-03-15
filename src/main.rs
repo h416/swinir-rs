@@ -4,7 +4,7 @@ mod pipeline;
 
 use anyhow::Result;
 use clap::Parser;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const FFMPEG_ALGORITHMS: &[&str] = &["bicubic", "lanczos", "spline"];
 
@@ -50,7 +50,13 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let factor = parse_scale(&cli.scale)?;
 
-    if FFMPEG_ALGORITHMS.contains(&cli.algorithm.as_str()) {
+    let is_png = |p: &Path| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("png"));
+    if is_png(&cli.input) && is_png(&cli.output) {
+        if cli.algorithm != "swinir" {
+            anyhow::bail!("PNG image upscaling only supports swinir algorithm");
+        }
+        pipeline::swinir_image_scale(&cli.input, &cli.output, factor, cli.model.as_deref(), Some(cli.tile_size), cli.profile, cli.bf16)?;
+    } else if FFMPEG_ALGORITHMS.contains(&cli.algorithm.as_str()) {
         ffmpeg::ffmpeg_scale(&cli.input, &cli.output, factor, &cli.algorithm, cli.crf)?;
     } else if cli.algorithm == "swinir" {
         pipeline::swinir_scale(&cli.input, &cli.output, factor, cli.crf, cli.model.as_deref(), Some(cli.tile_size), cli.profile, cli.bf16)?;

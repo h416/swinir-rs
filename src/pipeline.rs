@@ -1,10 +1,93 @@
 use anyhow::{Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use crate::ffmpeg;
 use crate::inference::SwinIRModel;
+
+/// Resolve the TorchScript model path from an optional override or default search paths.
+fn resolve_model_path(model_override: Option<&Path>, factor: u32) -> Result<PathBuf> {
+    if let Some(p) = model_override {
+        let path = p.to_path_buf();
+        if !path.exists() {
+            anyhow::bail!(
+                "TorchScript model not found: {}\nPlease run export_torchscript.py first.",
+                path.display()
+            );
+        }
+        return Ok(path);
+    }
+
+    let exe_dir = std::env::current_exe()
+        .context("Failed to get executable path")?
+        .parent()
+        .context("Executable parent directory not found")?
+        .to_path_buf();
+    let candidates = [
+        exe_dir.join("weights"),
+        exe_dir.join("../weights"),
+        exe_dir.join("../../weights"),
+        exe_dir.join("../../../weights"),
+    ];
+    let model_path = candidates.iter()
+        .map(|c| c.join(format!("swinir_real_x{}_traced.pt", factor)))
+        .find(|p| p.exists())
+        .unwrap_or_else(|| {
+            // Final fallback: CARGO_MANIFEST_DIR (for development)
+            Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
+                .join("weights")
+                .join(format!("swinir_real_x{}_traced.pt", factor))
+        });
+
+    if !model_path.exists() {
+        anyhow::bail!(
+            "TorchScript model not found: {}\nPlease run export_torchscript.py first.",
+            model_path.display()
+        );
+    }
+    Ok(model_path)
+}
+
+pub fn swinir_image_scale(input: &Path, output: &Path, factor: u32, model_override: Option<&Path>, tile_size: Option<u32>, profile: bool, bf16: bool) -> Result<()> {
+    if factor != 2 && factor != 4 {
+        anyhow::bail!("SwinIR does not support x{}. Only x2/x4 are supported.", factor);
+    }
+
+    let precision = if bf16 { "BF16" } else { "FP32" };
+    println!(
+        "SwinIR x{} {}: {} -> {}",
+        factor, precision,
+        input.display(), output.display()
+    );
+
+    let model_path = resolve_model_path(model_override, factor)?;
+
+    if let Some(ts) = tile_size {
+        if ts != 0 && ts % 8 != 0 {
+            anyhow::bail!("Tile size must be 0 (no tiling) or a multiple of 8, got {}", ts);
+        }
+    }
+
+    println!("Loading model...");
+    let mut model = SwinIRModel::new(&model_path, factor, tile_size, profile, bf16)?;
+
+    let img = image::open(input)
+        .with_context(|| format!("Failed to load image: {}", input.display()))?
+        .to_rgb8();
+
+    println!("Upscaling...");
+    let start = Instant::now();
+    let upscaled = model.upscale(&img)?;
+    let elapsed = start.elapsed();
+    println!("Upscaling done ({:.2}s)", elapsed.as_secs_f64());
+
+    upscaled.save(output)
+        .with_context(|| format!("Failed to save image: {}", output.display()))?;
+
+    println!("Done: {}", output.display());
+    Ok(())
+}
 
 pub fn swinir_scale(input: &Path, output: &Path, factor: u32, crf: u32, model_override: Option<&Path>, tile_size: Option<u32>, profile: bool, bf16: bool) -> Result<()> {
     if factor != 2 && factor != 4 {
@@ -25,46 +108,7 @@ pub fn swinir_scale(input: &Path, output: &Path, factor: u32, crf: u32, model_ov
         if info.has_audio { "yes" } else { "no" }
     );
 
-    // Determine TorchScript model path
-    // Search for weights directory relative to the executable
-    // (so the binary works when deployed to another machine)
-    let default_path;
-    let model_path = match model_override {
-        Some(p) => p,
-        None => {
-            let exe_dir = std::env::current_exe()
-                .context("Failed to get executable path")?
-                .parent()
-                .context("Executable parent directory not found")?
-                .to_path_buf();
-            // Search for weights/ relative to exe, fall back to CARGO_MANIFEST_DIR
-            let candidates = [
-                exe_dir.join("weights"),
-                exe_dir.join("../weights"),
-                exe_dir.join("../../weights"),
-                exe_dir.join("../../../weights"),
-            ];
-            let weights_dir = candidates.iter()
-                .map(|c| c.join(format!("swinir_real_x{}_traced.pt", factor)))
-                .find(|p| p.exists());
-            default_path = match weights_dir {
-                Some(p) => p,
-                None => {
-                    // Final fallback: CARGO_MANIFEST_DIR (for development)
-                    Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
-                        .join("weights")
-                        .join(format!("swinir_real_x{}_traced.pt", factor))
-                }
-            };
-            &default_path
-        }
-    };
-    if !model_path.exists() {
-        anyhow::bail!(
-            "TorchScript model not found: {}\nPlease run export_torchscript.py first.",
-            model_path.display()
-        );
-    }
+    let model_path = resolve_model_path(model_override, factor)?;
 
     if let Some(ts) = tile_size {
         if ts != 0 && ts % 8 != 0 {

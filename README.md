@@ -1,10 +1,10 @@
 # swinir-rs
 
-AI video upscaling on Apple Silicon using [SwinIR](https://github.com/JingyunLiang/SwinIR) (Swin Transformer for Image Restoration). Powered by TorchScript and [tch-rs](https://github.com/LaurentMazare/tch-rs) with MPS GPU acceleration.
+AI video/image upscaling on Apple Silicon using [SwinIR](https://github.com/JingyunLiang/SwinIR) (Swin Transformer for Image Restoration). Powered by TorchScript and [tch-rs](https://github.com/LaurentMazare/tch-rs) with MPS GPU acceleration.
 
 ## Features
 
-- **SwinIR super-resolution** -- x2 and x4 upscaling for real-world video
+- **SwinIR super-resolution** -- x2 and x4 upscaling for real-world video and PNG images
 - **MPS GPU acceleration** -- runs on Apple Silicon GPU via Metal Performance Shaders
 - **BFloat16 inference** -- optional BF16 mode for faster processing on M3+ chips
 - **Tiled processing** -- handles large frames with configurable tile size and overlap blending
@@ -47,15 +47,15 @@ On the first build, libtorch (~300MB) is downloaded automatically. The build scr
 ## Usage
 
 ```bash
-./target/release/swinir-rs INPUT.mp4 OUTPUT.mp4 SCALE [OPTIONS]
+./target/release/swinir-rs INPUT OUTPUT SCALE [OPTIONS]
 ```
 
 ### Arguments
 
 | Argument | Description |
 |----------|-------------|
-| `INPUT`  | Input MP4 path |
-| `OUTPUT` | Output MP4 path |
+| `INPUT`  | Input file path (MP4 or PNG) |
+| `OUTPUT` | Output file path (MP4 or PNG) |
 | `SCALE`  | Scale factor: `x2`, `x3`, `x4` |
 
 ### Options
@@ -95,6 +95,10 @@ Use `--tile-size 0` to process the entire frame at once (requires more GPU memor
 
 # lanczos interpolation via ffmpeg (no GPU needed)
 ./target/release/swinir-rs input.mp4 output.mp4 x2 -a lanczos
+
+# PNG image upscale (SwinIR only)
+./target/release/swinir-rs input.png output.png x2
+./target/release/swinir-rs input.png output.png x4 --bf16
 ```
 
 ## Algorithms
@@ -138,12 +142,18 @@ If you want to export the TorchScript models yourself instead of downloading the
 
 ## How It Works
 
+### Video (MP4)
 1. Extract video frames as PNG using ffmpeg (with VideoToolbox hardware decoding)
 2. Upscale each frame through the SwinIR TorchScript model on MPS GPU
 3. Extract audio from the original video
 4. Recombine upscaled frames + audio into the output MP4
 
-For large frames, the tiled processing mode splits each frame into overlapping tiles, processes them individually, and blends the results using linear weighting in the overlap regions.
+### Image (PNG)
+1. Load the PNG image
+2. Upscale through the SwinIR TorchScript model on MPS GPU
+3. Save the upscaled image directly
+
+For large frames/images, the tiled processing mode splits into overlapping tiles, processes them individually, and blends the results using linear weighting in the overlap regions.
 
 ## License
 
